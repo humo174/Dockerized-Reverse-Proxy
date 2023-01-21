@@ -1,0 +1,42 @@
+version: "3"
+services:
+  
+  proxy:
+    container_name: proxy
+    image: jwilder/nginx-proxy
+    restart: always
+    volumes:
+      - /srv/letsencrypt/certs:/etc/nginx/certs:ro
+      - /srv/letsencrypt/vhost.d:/etc/nginx/vhost.d
+      - /srv/letsencrypt/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    ports:
+      - "80:80"
+      - "443:443"
+      
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt-companion
+    restart: always
+    volumes:
+      - /srv/letsencrypt/certs:/etc/nginx/certs
+      - /srv/letsencrypt/vhost.d:/etc/nginx/vhost.d
+      - /srv/letsencrypt/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - proxy
+    environment:
+      - NGINX_PROXY_CONTAINER=proxy
+      
+  site1:
+    container_name: site1
+    build: ./site1
+    restart: always
+    environment:
+#      - HTTPS_METHOD=noredirect
+      - HTTPS_METHOD=redirect
+      - HSTS=off
+      - VIRTUAL_HOST=site1.ru
+#      - CERTNAME=
+      - LETSENCRYPT_HOST=site1.ru
+      - LETSENCRYPT_EMAIL=your@email.ru
