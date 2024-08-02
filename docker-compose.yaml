@@ -1,26 +1,23 @@
 version: "3"
 services:
   proxy:
-    image: jwilder/nginx-proxy:alpine
     container_name: back_proxy
+    image: jwilder/nginx-proxy
     restart: always
-    ports:
-      - 80:80
-      - 443:443
-    labels:
-      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
     volumes:
       - /srv/letsencrypt/certs:/etc/nginx/certs:ro
       - /srv/letsencrypt/vhost.d:/etc/nginx/vhost.d
       - /srv/letsencrypt/html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./proxy/uploadsize.conf:/etc/nginx/conf.d/uploadsize.conf
-      - ./proxy/proxy_pass.conf:/etc/nginx/conf.d/proxy_pass.conf
+    ports:
+      - "80:80"
+      - "443:443"
     logging:
         driver: "json-file"
         options:
-            max-size: "512m"
-
+            max-size: "50m"
+      
+      
   letsencrypt-companion:
     image: jrcs/letsencrypt-nginx-proxy-companion
     container_name: back_letsencrypt-companion
@@ -32,10 +29,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - proxy
+    environment:
+      - NGINX_PROXY_CONTAINER=proxy
     logging:
         driver: "json-file"
         options:
-            max-size: "512m"
+            max-size: "50m"
       
   mysite.ru:
     image: nginx
