@@ -1,0 +1,65 @@
+services:
+  proxy:
+    image: jwilder/nginx-proxy
+    container_name: proxy
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./letsencrypt/certs:/etc/nginx/certs:ro
+      - ./letsencrypt/vhost.d:/etc/nginx/vhost.d
+      - ./letsencrypt/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./conf/uploadsize.conf:/etc/nginx/conf.d/uploadsize.conf
+      - ./conf/proxy_pass.conf:/etc/nginx/conf.d/proxy_pass.conf
+    networks:
+      - proxy-tier
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "30m"
+
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt-companion
+    restart: always
+    volumes:
+      - ./letsencrypt/certs:/etc/nginx/certs
+      - ./letsencrypt/vhost.d:/etc/nginx/vhost.d
+      - ./letsencrypt/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy-tier
+    depends_on:
+      - proxy
+    environment:
+      - NGINX_PROXY_CONTAINER=proxy
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "30m"
+            
+  service.foo.bar: #CHANGE_HERE
+    image: nginx
+    container_name: CHANGE_CONTAINER_NAME #CHANGE_HERE
+    restart: always
+    environment:
+#      - HTTPS_METHOD=noredirect
+      - HTTPS_METHOD=redirect
+      - HSTS=off
+      - VIRTUAL_HOST=SERVICE.FOO.BAR #CHANGE_HERE
+      - LETSENCRYPT_HOST=SERVICE.FOO.BAR #CHANGE_HERE
+      - LETSENCRYPT_EMAIL=SERVICE.FOO.BAR #CHANGE_HERE
+#      - CERT_NAME=SERVICE.FOO.BAR_CERTIFICATE_SELF #CHANGE_HERE
+    volumes:
+      - ./services/service.foo.bar/nginx.conf:/etc/nginx/nginx.conf #CHANGE_HERE
+    networks:
+      - proxy-tier
+    logging:
+        driver: "json-file"
+        options:
+            max-size: "30m"
+
+networks:
+  proxy-tier:
