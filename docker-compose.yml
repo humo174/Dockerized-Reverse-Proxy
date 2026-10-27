@@ -1,47 +1,72 @@
 services:
   proxy:
-    image: jwilder/nginx-proxy
+    image: nginx:1.31.8
     container_name: proxy
+    labels:
+      com.github.nginx-proxy.nginx-proxy.nginx: "true"
     restart: always
     ports:
       - 80:80
       - 443:443
     volumes:
+      - ./conf/generated:/etc/nginx/conf.d
+      - ./conf/uploadsize.conf:/etc/nginx/conf.d/uploadsize.conf:ro
+      - ./conf/proxy_pass.conf:/etc/nginx/conf.d/proxy_pass.conf:ro
       - ./letsencrypt/certs:/etc/nginx/certs:ro
       - ./letsencrypt/vhost.d:/etc/nginx/vhost.d
       - ./letsencrypt/html:/usr/share/nginx/html
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - ./conf/uploadsize.conf:/etc/nginx/conf.d/uploadsize.conf
-      - ./conf/proxy_pass.conf:/etc/nginx/conf.d/proxy_pass.conf
     networks:
       - proxy-tier
     logging:
-        driver: "json-file"
-        options:
-            max-size: "30m"
+      driver: "json-file"
+      options:
+        max-size: "30m"
+
+  docker-gen:
+    # Специальаня версия которая хранит в себе шаблон для построения конфига. Перед сменой нужно выбрать образ без nginx и с преднастроенным nginx.tmpl
+    image: nginxproxy/nginx-proxy:1.11.6-dockergen
+    container_name: docker-gen
+    restart: always
+    volumes:
+      - ./conf/generated:/etc/nginx/conf.d
+      - ./letsencrypt/certs:/etc/nginx/certs:ro
+      - ./letsencrypt/vhost.d:/etc/nginx/vhost.d:ro
+      - ./letsencrypt/html:/usr/share/nginx/html:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - proxy-tier
+    depends_on:
+      - proxy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
 
   letsencrypt-companion:
-    image: jrcs/letsencrypt-nginx-proxy-companion
+    image: nginxproxy/acme-companion:latest
     container_name: letsencrypt-companion
     restart: always
     volumes:
       - ./letsencrypt/certs:/etc/nginx/certs
       - ./letsencrypt/vhost.d:/etc/nginx/vhost.d
       - ./letsencrypt/html:/usr/share/nginx/html
+      - ./letsencrypt/acme:/etc/acme.sh
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy-tier
     depends_on:
       - proxy
+      - docker-gen
     environment:
       - NGINX_PROXY_CONTAINER=proxy
+      - NGINX_DOCKER_GEN_CONTAINER=docker-gen
     logging:
-        driver: "json-file"
-        options:
-            max-size: "30m"
+      driver: "json-file"
+      options:
+        max-size: "30m"
             
   service.foo.bar: #CHANGE_HERE
-    image: nginx
+    image: nginx:1.31.8
     container_name: CHANGE_CONTAINER_NAME #CHANGE_HERE
     restart: always
     environment:
